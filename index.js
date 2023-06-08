@@ -1,6 +1,6 @@
 const express = require('express');
 const app = express();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const cors = require('cors');
 require('dotenv').config();
 const port = process.env.PORT || 5000;
@@ -50,6 +50,22 @@ async function run() {
         }
         const result = await userCollections.insertOne(user);
         res.send(result);
+    })
+
+    app.patch('/users/role', async (req, res) => {
+      const id = req.query.id;
+      const role = req.query.role;
+      console.log(id, role);
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: `${role}`
+        },
+      };
+
+      const result = await userCollections.updateOne(filter, updateDoc);
+      res.send(result);
+
     })
 
     // classes operations
