@@ -40,6 +40,14 @@ async function run() {
       const result = await userCollections.find().toArray();
       res.send(result);
     })
+    
+    app.delete('/users', async (req, res) => {
+      const id =  req.query.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await userCollections.deleteOne(query);
+      res.send(result);
+    })
+
     app.post('/users', async(req, res) => {
         const user = req.body;
         const query = { user: user.email };
@@ -74,8 +82,44 @@ async function run() {
       res.send(result);
     })
 
+    app.post("/classes", async (req, res) => {
+      const classData = req.body;
+      const result = await classCollections.insertOne(classData);
+      res.send(result);
+    });
 
+    app.patch('/classes/status', async (req, res) => {
+      const id = req.query.id;
+      const status = req.query.status;
+      console.log(id, status);
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: `${status}`
+        },
+      };
 
+      const result = await classCollections.updateOne(filter, updateDoc);
+      res.send(result);
+
+    })
+   
+
+    app.patch('/classes/feedback', async (req, res) => {
+      const id = req.query.id;
+      const feedback = req.query.feedback;
+      console.log(id, feedback);
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          feedback: `${feedback}`
+        },
+      };
+
+      const result = await classCollections.updateOne(filter, updateDoc);
+      res.send(result);
+
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
