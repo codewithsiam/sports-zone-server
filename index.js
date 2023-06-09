@@ -73,7 +73,12 @@ async function run() {
 
       const result = await userCollections.updateOne(filter, updateDoc);
       res.send(result);
-
+    })
+    // instructor api
+    app.get('/users/instructor', async (req, res) => {
+      const filter = {role: 'instructor'};
+      const result = await userCollections.find(filter).toArray();
+      res.send(result);
     })
 
     // classes operations
