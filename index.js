@@ -50,14 +50,16 @@ async function run() {
 
     app.post('/users', async(req, res) => {
         const user = req.body;
-        const query = { user: user.email };
+        const query = { email: user.email };
         const existingUser = await userCollections.findOne(query);
-
+      console.log(existingUser, user.email);
         if(existingUser) {
             return res.send({message: "User already exists"})
         }
+       else{
         const result = await userCollections.insertOne(user);
         res.send(result);
+       }
     })
 
     app.patch('/users/role', async (req, res) => {
