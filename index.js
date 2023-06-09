@@ -84,6 +84,11 @@ async function run() {
     })
 
     // classes operations
+    app.get('/allClasses', async (req, res) => {
+      const filter = {status: 'approved'};
+      const result = await classCollections.find(filter).toArray();
+      res.send(result);
+    })
     app.get('/classes', async (req, res) => {
       const result = await classCollections.find().toArray();
       res.send(result);
