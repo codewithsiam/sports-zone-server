@@ -32,7 +32,9 @@ async function run() {
 
     // collections
     const userCollections = await client.db("sportsZone").collection("users");
-    const paymentCollection = await client.db("sportsZone").collection("payments");
+    const paymentCollection = await client
+      .db("sportsZone")
+      .collection("payments");
     const classCollections = await client
       .db("sportsZone")
       .collection("classes");
@@ -167,28 +169,54 @@ async function run() {
       res.send(result);
     });
 
-    // payment methods stripe 
-    app.post('/create-payment-intent', async (req, res) => {
+    // payment methods stripe
+    app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
-        currency: 'usd',
-        payment_method_types: ['card']
+        currency: "usd",
+        payment_method_types: ["card"],
       });
 
       res.send({
-        clientSecret: paymentIntent.client_secret
-      })
-    })
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
 
-app.post('/payments', async (req, res) => {
-  const payment = req.body; 
-  const result = await paymentCollection.insertOne(payment);
-  res.send(result);
-})
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      console.log(payment.classId);
+      const filter = { _id: new ObjectId(payment.classId) };
+      const oldClass = await classCollections.findOne(filter);
+      console.log("oldSeat", oldClass.availableSeats);
+      const newSeat = parseFloat(oldClass?.availableSeats) - 1;
+      console.log("new Seat", newSeat);
+      const updateDoc = {
+        $set: {
+          availableSeats: `${newSeat}`,
+        },
+      };
+      const updateResult = await classCollections.updateOne(filter, updateDoc);
 
+      const postResult = await paymentCollection.insertOne(payment);
+      res.send({ postResult, updateResult });
+    });
 
+    app.get("/payments/enrolled/student", async (req, res) => {
+      const email = req.query.email;
+      console.log(email);
+      const filter = { studentEmail: email };
+      const result = await paymentCollection.find(filter).toArray();
+      res.send(result);
+    });
+    app.get("/payments/enrolled/instructor", async (req, res) => {
+      const email = req.query.email;
+      console.log(email);
+      const filter = { instructorEmail: email };
+      const result = await classCollections.find(filter).toArray();
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
