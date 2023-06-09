@@ -1,16 +1,16 @@
-const express = require('express');
+const express = require("express");
 const app = express();
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const cors = require('cors');
-require('dotenv').config();
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const cors = require("cors");
+require("dotenv").config();
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // middlewares
 app.use(cors());
 app.use(express.json());
 
-//mongodb connection 
-
+//mongodb connection
 
 // const uri = "mongodb://0.0.0.0:27017";
 
@@ -22,7 +22,7 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
@@ -30,74 +30,86 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-    // collections 
+    // collections
     const userCollections = await client.db("sportsZone").collection("users");
-    const classCollections = await client.db("sportsZone").collection("classes");
-    const enrolledClassCollections = await client.db("sportsZone").collection("enrolledClasses");
-
+    const paymentCollections = await client.db("sportsZone").collection("payments");
+    const classCollections = await client
+      .db("sportsZone")
+      .collection("classes");
+    const enrolledClassCollections = await client
+      .db("sportsZone")
+      .collection("enrolledClasses");
+    const selectedClassCollection = await client
+      .db("sportsZone")
+      .collection("selectedClasses");
 
     // users operations
-    app.get('/users', async (req, res) => {
-      const sort = { createdAt: -1 }; 
+    app.get("/users", async (req, res) => {
+      const sort = { createdAt: -1 };
       const result = await userCollections.find().sort(sort).toArray();
       res.send(result);
-    })
-    
-    app.delete('/users', async (req, res) => {
-      const id =  req.query.id;
-      const query = { _id: new ObjectId(id) }
+    });
+
+    app.delete("/users", async (req, res) => {
+      const id = req.query.id;
+      const query = { _id: new ObjectId(id) };
       const result = await userCollections.deleteOne(query);
       res.send(result);
-    })
+    });
 
-    app.post('/users', async(req, res) => {
-        const user = req.body;
-        const query = { email: user.email };
-        const existingUser = await userCollections.findOne(query);
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      const existingUser = await userCollections.findOne(query);
       console.log(existingUser, user.email);
-        if(existingUser) {
-            return res.send({message: "User already exists"})
-        }
-       else{
+      if (existingUser) {
+        return res.send({ message: "User already exists" });
+      } else {
         const result = await userCollections.insertOne(user);
         res.send(result);
-       }
-    })
+      }
+    });
 
-    app.patch('/users/role', async (req, res) => {
+    app.patch("/users/role", async (req, res) => {
       const id = req.query.id;
       const role = req.query.role;
       console.log(id, role);
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
-          role: `${role}`
+          role: `${role}`,
         },
       };
 
       const result = await userCollections.updateOne(filter, updateDoc);
       res.send(result);
-    })
+    });
     // instructor api
-    app.get('/users/instructor', async (req, res) => {
-      const filter = {role: 'instructor'};
+    app.get("/users/instructor", async (req, res) => {
+      const filter = { role: "instructor" };
       const result = await userCollections.find(filter).toArray();
       res.send(result);
-    })
+    });
 
     // classes operations
-    app.get('/allClasses', async (req, res) => {
-      const filter = { status: 'approved' };
-      const sort = { createdAt: -1 }; 
+    app.get("/classes/approved", async (req, res) => {
+      const filter = { status: "approved" };
+      const sort = { createdAt: -1 };
+      const result = await classCollections.find(filter).sort(sort).toArray();
+      res.send(result);
+    });
+    app.get("/classes/denied", async (req, res) => {
+      const filter = { status: "denied" };
+      const sort = { createdAt: -1 };
       const result = await classCollections.find(filter).sort(sort).toArray();
       res.send(result);
     });
 
-    app.get('/classes', async (req, res) => {
-      const sort = { createdAt: -1 }; 
+    app.get("/classes", async (req, res) => {
+      const sort = { createdAt: -1 };
       const result = await classCollections.find().sort(sort).toArray();
       res.send(result);
-    })
+    });
 
     app.post("/classes", async (req, res) => {
       const classData = req.body;
@@ -105,46 +117,80 @@ async function run() {
       res.send(result);
     });
 
-    app.patch('/classes/status', async (req, res) => {
+    app.patch("/classes/status", async (req, res) => {
       const id = req.query.id;
       const status = req.query.status;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
-          status: `${status}`
+          status: `${status}`,
         },
       };
 
       const result = await classCollections.updateOne(filter, updateDoc);
       res.send(result);
+    });
 
-    })
-   
-
-    app.patch('/classes/feedback', async (req, res) => {
+    app.patch("/classes/feedback", async (req, res) => {
       const id = req.query.id;
       const feedback = req.query.feedback;
       console.log(id, feedback);
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
-          feedback: `${feedback}`
+          feedback: `${feedback}`,
         },
       };
       const result = await classCollections.updateOne(filter, updateDoc);
       res.send(result);
-    })
+    });
 
-    // my enrolled classes 
-    p.post("/classes/enrolled", async (req, res) => {
-      const classData = req.body;
-      const result = await enrolledClassCollections.insertOne(classData);
+    // my selected classes
+    app.get("/classes/selected", async (req, res) => {
+      const result = await selectedClassCollection.find().toArray();
       res.send(result);
     });
 
+    app.post("/classes/selected", async (req, res) => {
+      const classData = req.body;
+      const result = await selectedClassCollection.insertOne(classData);
+      res.send(result);
+    });
+
+    app.delete("/classes/selected", async (req, res) => {
+      const id = req.query.id;
+      const email = req.query.email;
+      console.log(id, email);
+      // const query = {_id: id};
+      const query = { _id: new ObjectId(id) };
+      const result = await selectedClassCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // payment methods stripe 
+    app.post('/create-payment-intent', async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    })
+
+
+
+    
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -152,12 +198,11 @@ async function run() {
 }
 run().catch(console.dir);
 
+// server run
+app.get("/", (req, res) => {
+  res.send("Sport Zone is running...");
+});
 
-// server run 
-app.get('/', (req, res) =>{
-    res.send('Sport Zone is running...')
-})
-
-app.listen(port, ()=> {
-    console.log(`listening on port ${port}`)
+app.listen(port, () => {
+  console.log(`listening on port ${port}`);
 });
