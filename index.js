@@ -32,7 +32,7 @@ async function run() {
 
     // collections
     const userCollections = await client.db("sportsZone").collection("users");
-    const paymentCollections = await client.db("sportsZone").collection("payments");
+    const paymentCollection = await client.db("sportsZone").collection("payments");
     const classCollections = await client
       .db("sportsZone")
       .collection("classes");
@@ -182,9 +182,13 @@ async function run() {
       })
     })
 
+app.post('/payments', async (req, res) => {
+  const payment = req.body; 
+  const result = await paymentCollection.insertOne(payment);
+  res.send(result);
+})
 
 
-    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
