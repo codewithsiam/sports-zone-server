@@ -176,7 +176,7 @@ async function run() {
     app.get("/classes/top", async (req, res) => {
       const sort = { totalEnrolled: -1 };
       const filter = { status: "approved" };
-      const result = await classCollections.find(filter).sort(sort).toArray();
+      const result = await classCollections.find(filter).sort(sort).limit(6).toArray();
       res.send(result);
     });
 
@@ -300,6 +300,41 @@ async function run() {
       const result = await classCollections.find(filter).toArray();
       res.send(result);
     });
+
+    //get top instructor 
+    app.get("/instructors/popular", async (req, res) => {
+      try {
+        const instructors = await classCollections.aggregate([
+          {
+            $group: {
+              _id: "$instructorEmail",
+              count: { $sum: 1 },
+              instructorPhoto: { $first: "$instructorPhoto" },
+              instructorName: { $first: "$instructorName" },
+              instructorEmail: { $first: "$instructorEmail" },
+            },
+          },
+          { $sort: { count: -1 } },
+          { $limit: 6 }, 
+          {
+            $project: {
+              _id: 0,
+              instructorPhoto: 1,
+              instructorName: 1,
+              instructorEmail: 1,
+              count: 1,
+            },
+          },
+        ]).toArray();
+    
+        res.json(instructors);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+    
+    
 
     
 
