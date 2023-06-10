@@ -50,7 +50,7 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-    // collections
+    // collections --------------------------------------------
     const userCollections = await client.db("sportsZone").collection("users");
     const paymentCollection = await client
       .db("sportsZone")
@@ -62,7 +62,7 @@ async function run() {
       .db("sportsZone")
       .collection("selectedClasses");
 
-      // jwt post 
+      // jwt post -------------------------------------------------------
       app.post('/jwt', (req, res) => {
         // todo: env file is posting on github. 
         const user = req.body;
@@ -71,7 +71,7 @@ async function run() {
         res.send({ token })
       })
 
-      // verufy admin 
+      // verufy admin -------------------------------------------
       const verifyAdmin = async (req, res, next) => {
         const email = req.decoded.email;
         const query = { email: email }
@@ -92,13 +92,40 @@ async function run() {
         next();
       }
 
-    // users operations
+    // users operations ---------------------------------------------
     app.get("/users", verifyJWT, async (req, res) => {
       const sort = { createdAt: -1 };
       const result = await userCollections.find().sort(sort).toArray();
       res.send(result);
     });
+ 
+    // is admin 
+    app.get('/users/admin/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
 
+      if (req.decoded.email !== email) {
+        return res.send({ admin: false })
+      }
+
+      const query = { email: email }
+      const user = await userCollections.findOne(query);
+      const result = { admin: user?.role === 'admin' }
+      res.send(result);
+    })
+  
+    // is instructor 
+    app.get('/users/instructor/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      if (req.decoded.email !== email) {
+        return res.send({ instructor: false })
+      }
+
+      const query = { email: email }
+      const user = await userCollections.findOne(query);
+      const result = { instructor: user?.role === 'instructor' }
+      res.send(result);
+    })
 
     app.delete("/users", async (req, res) => {
       const id = req.query.id;
@@ -139,7 +166,20 @@ async function run() {
       res.send(result);
     });
 
-    // classes operations
+    // classes operations =========================================================
+    app.get("/classes", async (req, res) => {
+      const sort = { createdAt: -1 };
+      const result = await classCollections.find().sort(sort).toArray();
+      res.send(result);
+    });
+
+    app.get("/classes/top", async (req, res) => {
+      const sort = { totalEnrolled: -1 };
+      const filter = { status: "approved" };
+      const result = await classCollections.find(filter).sort(sort).toArray();
+      res.send(result);
+    });
+
     app.get("/classes/approved", async (req, res) => {
       const filter = { status: "approved" };
       const sort = { createdAt: -1 };
@@ -153,11 +193,6 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/classes", async (req, res) => {
-      const sort = { createdAt: -1 };
-      const result = await classCollections.find().sort(sort).toArray();
-      res.send(result);
-    });
 
     app.post("/classes", async (req, res) => {
       const classData = req.body;
@@ -213,7 +248,7 @@ async function run() {
       res.send(result);
     });
 
-    // payment methods stripe
+    // payment methods stripe----------------------------------------------------------------
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
@@ -248,6 +283,11 @@ async function run() {
       res.send({ postResult, updateResult });
     });
 
+    app.get("/payments/history", async (req, res) => {
+      const email = req.query.email;
+      const result = await paymentCollection.find().toArray();
+      res.send(result);
+    });
     app.get("/payments/enrolled/student", async (req, res) => {
       const email = req.query.email;
       const filter = { studentEmail: email };
