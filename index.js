@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
+const jwt = require('jsonwebtoken');
 require("dotenv").config();
 const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.PORT || 5000;
@@ -9,6 +10,25 @@ const port = process.env.PORT || 5000;
 // middlewares
 app.use(cors());
 app.use(express.json());
+
+// verify jwt token
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res.status(401).send({ error: true, message: 'unauthorized access' });
+  }
+  // bearer token
+  const token = authorization.split(' ')[1];
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ error: true, message: 'unauthorized access' })
+    }
+    req.decoded = decoded;
+    next();
+  })
+}
+
 
 //mongodb connection
 
@@ -38,19 +58,47 @@ async function run() {
     const classCollections = await client
       .db("sportsZone")
       .collection("classes");
-    const enrolledClassCollections = await client
-      .db("sportsZone")
-      .collection("enrolledClasses");
     const selectedClassCollection = await client
       .db("sportsZone")
       .collection("selectedClasses");
 
+      // jwt post 
+      app.post('/jwt', (req, res) => {
+        // todo: env file is posting on github. 
+        const user = req.body;
+        const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+  
+        res.send({ token })
+      })
+
+      // verufy admin 
+      const verifyAdmin = async (req, res, next) => {
+        const email = req.decoded.email;
+        const query = { email: email }
+        const user = await userCollections.findOne(query);
+        if (user?.role !== 'admin') {
+          return res.status(403).send({ error: true, message: 'forbidden message' });
+        }
+        next();
+      }
+      // verufy instructor 
+      const verifyInstructor = async (req, res, next) => {
+        const email = req.decoded.email;
+        const query = { email: email }
+        const user = await userCollections.findOne(query);
+        if (user?.role !== 'instructor') {
+          return res.status(403).send({ error: true, message: 'forbidden message' });
+        }
+        next();
+      }
+
     // users operations
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyJWT, async (req, res) => {
       const sort = { createdAt: -1 };
       const result = await userCollections.find().sort(sort).toArray();
       res.send(result);
     });
+
 
     app.delete("/users", async (req, res) => {
       const id = req.query.id;
@@ -63,7 +111,6 @@ async function run() {
       const user = req.body;
       const query = { email: user.email };
       const existingUser = await userCollections.findOne(query);
-      console.log(existingUser, user.email);
       if (existingUser) {
         return res.send({ message: "User already exists" });
       } else {
@@ -75,7 +122,6 @@ async function run() {
     app.patch("/users/role", async (req, res) => {
       const id = req.query.id;
       const role = req.query.role;
-      console.log(id, role);
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
@@ -87,7 +133,7 @@ async function run() {
       res.send(result);
     });
     // instructor api
-    app.get("/users/instructor", async (req, res) => {
+    app.get("/users/instructors", async (req, res) => {
       const filter = { role: "instructor" };
       const result = await userCollections.find(filter).toArray();
       res.send(result);
@@ -136,7 +182,6 @@ async function run() {
     app.patch("/classes/feedback", async (req, res) => {
       const id = req.query.id;
       const feedback = req.query.feedback;
-      console.log(id, feedback);
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
@@ -162,7 +207,6 @@ async function run() {
     app.delete("/classes/selected", async (req, res) => {
       const id = req.query.id;
       const email = req.query.email;
-      console.log(id, email);
       // const query = {_id: id};
       const query = { _id: new ObjectId(id) };
       const result = await selectedClassCollection.deleteOne(query);
@@ -186,15 +230,16 @@ async function run() {
 
     app.post("/payments", async (req, res) => {
       const payment = req.body;
-      console.log(payment.classId);
       const filter = { _id: new ObjectId(payment.classId) };
       const oldClass = await classCollections.findOne(filter);
-      console.log("oldSeat", oldClass.availableSeats);
+
       const newSeat = parseFloat(oldClass?.availableSeats) - 1;
-      console.log("new Seat", newSeat);
+      const newTotalEnrolled = parseFloat(oldClass?.totalEnrolled) + 1;
+
       const updateDoc = {
         $set: {
           availableSeats: `${newSeat}`,
+          totalEnrolled: `${newTotalEnrolled}`,
         },
       };
       const updateResult = await classCollections.updateOne(filter, updateDoc);
@@ -205,18 +250,18 @@ async function run() {
 
     app.get("/payments/enrolled/student", async (req, res) => {
       const email = req.query.email;
-      console.log(email);
       const filter = { studentEmail: email };
       const result = await paymentCollection.find(filter).toArray();
       res.send(result);
     });
     app.get("/payments/enrolled/instructor", async (req, res) => {
       const email = req.query.email;
-      console.log(email);
       const filter = { instructorEmail: email };
       const result = await classCollections.find(filter).toArray();
       res.send(result);
     });
+
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
