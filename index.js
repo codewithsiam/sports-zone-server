@@ -337,93 +337,100 @@ async function run() {
     //get top instructor
 
     app.get("/instructors/popular", async (req, res) => {
-      try {
-      // I make a empty array for push all seleted instructors and send to the client. 
-        const selectedInstructors = [];
+      const filter = {role: 'instructor'}
+      const result = await userCollections.find(filter).toArray();
+      res.send(result);
+    }) ; 
 
-        // now i get the populat instructor based on the students enroll information 
-        const popularInstructors = await classCollections
-          .aggregate([
-            {
-              $group: {
-                _id: "$instructorEmail",
-                totalEnrolled: { $sum: 1 },
-              },
-            },
-            { $sort: { totalEnrolled: -1 } },
-            { $limit: 6 },
-          ])
-          .toArray();
-// then i matched the instructorEmails with the popularInstructors 
-        const paymentInstructors = await paymentCollection
-          .aggregate([
-            {
-              $match: {
-                instructorEmail: { $in: popularInstructors.map((i) => i._id) },
-              },
-            },
-            {
-              $group: {
-                _id: "$instructorEmail",
-                totalPayments: { $sum: 1 },
-              },
-            },
-          ])
-          .toArray();
+    // below code is unfortunately not working 
+//     app.get("/instructors/popular", async (req, res) => {
+//       try {
+//       // I make a empty array for push all seleted instructors and send to the client. 
+//         const selectedInstructors = [];
 
-        for (const instructor of popularInstructors) {
-          const paymentInstructor = paymentInstructors.find(
-            (i) => i._id === instructor._id
-          );
-          if (paymentInstructor) {
-            selectedInstructors.push({
-              name: instructor._id,
-              email: instructor._id,
-              totalEnrolled: instructor.totalEnrolled,
-            });
-          }
-        }
-// now matching with the user collection and this will be the output 
-        const instructorEmails = selectedInstructors.map(
-          (instructor) => instructor.email
-        );
-        const users = await userCollections
-          .find({ email: { $in: instructorEmails } })
-          .toArray();
+//         // now i get the populat instructor based on the students enroll information 
+//         const popularInstructors = await classCollections
+//           .aggregate([
+//             {
+//               $group: {
+//                 _id: "$instructorEmail",
+//                 totalEnrolled: { $sum: 1 },
+//               },
+//             },
+//             { $sort: { totalEnrolled: -1 } },
+//             { $limit: 6 },
+//           ])
+//           .toArray();
+// // then i matched the instructorEmails with the popularInstructors 
+//         const paymentInstructors = await paymentCollection
+//           .aggregate([
+//             {
+//               $match: {
+//                 instructorEmail: { $in: popularInstructors.map((i) => i._id) },
+//               },
+//             },
+//             {
+//               $group: {
+//                 _id: "$instructorEmail",
+//                 totalPayments: { $sum: 1 },
+//               },
+//             },
+//           ])
+//           .toArray();
 
-        const finalResult = users.map((user) => {
-          const instructor = selectedInstructors.find(
-            (i) => i.email === user.email
-          );
-          return {
-            name: user.name,
-            email: user.email,
-            totalEnrolled: instructor.totalEnrolled,
-            image: user.photoURL,
-          };
-        });
+//         for (const instructor of popularInstructors) {
+//           const paymentInstructor = paymentInstructors.find(
+//             (i) => i._id === instructor._id
+//           );
+//           if (paymentInstructor) {
+//             selectedInstructors.push({
+//               name: instructor._id,
+//               email: instructor._id,
+//               totalEnrolled: instructor.totalEnrolled,
+//             });
+//           }
+//         }
+// // now matching with the user collection and this will be the output 
+//         const instructorEmails = selectedInstructors.map(
+//           (instructor) => instructor.email
+//         );
+//         const users = await userCollections
+//           .find({ email: { $in: instructorEmails } })
+//           .toArray();
 
-        // here we get the instructors who are now popular 
-        const remainingInstructors = await userCollections
-          .find({ email: { $nin: instructorEmails } })
-          .toArray();
+//         const finalResult = users.map((user) => {
+//           const instructor = selectedInstructors.find(
+//             (i) => i.email === user.email
+//           );
+//           return {
+//             name: user.name,
+//             email: user.email,
+//             totalEnrolled: instructor.totalEnrolled,
+//             image: user.photoURL,
+//           };
+//         });
 
-        // here we added the rest instructors if there class have no enroll . because if there are only two instructor who are popular then in the home page we will show only two instructor info . so we added lest instructors for display in the home page
-        const restInstructors = remainingInstructors.map((instructor) => ({
-          name: instructor.name,
-          email: instructor.email,
-          totalEnrolled: 0, // Set the enrollment count to 0 for the remaining instructors
-          image: instructor.photoURL,
-        }));
+//         // here we get the instructors who are now popular 
+//         const remainingInstructors = await userCollections
+//           .find({ email: { $nin: instructorEmails } })
+//           .toArray();
 
-        const completeResult = [...finalResult, ...restInstructors];
+//         // here we added the rest instructors if there class have no enroll . because if there are only two instructor who are popular then in the home page we will show only two instructor info . so we added lest instructors for display in the home page
+//         const restInstructors = remainingInstructors.map((instructor) => ({
+//           name: instructor.name,
+//           email: instructor.email,
+//           totalEnrolled: 0, // Set the enrollment count to 0 for the remaining instructors
+//           image: instructor.photoURL,
+//         }));
 
-        res.json(completeResult);
-      } catch (error) {
-        console.error(error);
-        res.status(500).send("Internal Server Error");
-      }
-    });
+//         const completeResult = [...finalResult, ...restInstructors];
+
+//         res.json(completeResult);
+//       } catch (error) {
+//         console.error(error);
+//         res.status(500).send("Internal Server Error");
+//       }
+//     });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
