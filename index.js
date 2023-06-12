@@ -51,7 +51,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     // collections --------------------------------------------
     const userCollections = await client.db("sportsZone").collection("users");
@@ -67,7 +67,6 @@ async function run() {
 
     // jwt post -------------------------------------------------------
     app.post("/jwt", (req, res) => {
-      // todo: env file is posting on github.
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "24h",
