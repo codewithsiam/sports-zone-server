@@ -70,7 +70,7 @@ async function run() {
       // todo: env file is posting on github.
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1h",
+        expiresIn: "24h",
       });
 
       res.send({ token });
@@ -145,7 +145,9 @@ async function run() {
 
     app.post("/users", async (req, res) => {
       const user = req.body;
+      console.log(user);
       const query = { email: user.email };
+
       const existingUser = await userCollections.findOne(query);
       if (existingUser) {
         return res.send({ message: "User already exists" });
